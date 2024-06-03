@@ -2,37 +2,87 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from connection.database_connection import Base, Database
 from datetime import datetime, timedelta
 from constants.paises import PAISES
 import requests
 
+import logging
+logging.basicConfig()
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+
 API_BASE_URL = os.getenv("API_BASE_URL")
 API_KEY = os.getenv("API_KEY")
 
-class Aerodromo(Base):
-    __tablename__ = 'Aerodromo'
-    id = Column(Integer, primary_key=True)
-    nome = Column(String(255), nullable=False)
-    codigo = Column(String(4), nullable=False)
-    pais = Column(String(255), nullable=False)
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
-    metars = relationship('Metar', back_populates='aerodromo')
-    previsoes = relationship('Previsao', back_populates='aerodromo')
+Base = declarative_base()
 
+class Localidade(Base):
+    __tablename__  = 'Localidade'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    codigo = Column(String(10))
+    pais = Column(String(255), nullable=False)
+    aerodromos = relationship('Aerodromo', back_populates='localidade')
+    metars = relationship('METAR', back_populates='localidade')
+    previsoes = relationship('Previsao', back_populates='localidade')
+    tafs = relationship('TAF', back_populates='localidade')
+    
     @staticmethod
     def extract():
         all_data = []
         for pais in PAISES:
             url = f"{API_BASE_URL}/aerodromos/?api_key={API_KEY}&pais={pais}"
-            response = requests.get(url)
+            response = requests.get(url) 
             if response.status_code == 200:
                 data = response.json()
-                all_data.extend(data["data"])
+                for item in data["data"]:
+                    all_data.append({
+                        'cod': item['cod'],
+                        'pais': item['pais'],
+                    })
         return all_data
+    
+    @staticmethod   
+    def save_data(session):
+        localidades_data = Localidade.extract()
+        for item in localidades_data:
+            localidade = Localidade(
+                codigo=item['cod'],
+                pais=item['pais']
+            )
+            session.add(localidade)
+        session.commit()
 
+class Aerodromo(Base):
+    __tablename__ = 'Aerodromo'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nome = Column(String(255), nullable=False)
+    cidade = Column(String(255), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    localidade_id = Column(Integer, ForeignKey('localidade.id'))
+    localidade = relationship('Localidade', back_populates='aerodromos')
+    radars = relationship('Radar', back_populates='aerodromo')
+    
+    @staticmethod
+    def extract():
+        all_data = []
+        for pais in PAISES:
+            url = f"{API_BASE_URL}/aerodromos/?api_key={API_KEY}&pais={pais}"
+            response = requests.get(url) 
+            if response.status_code == 200:
+                data = response.json()
+                for item in data["data"]:
+                    all_data.append({
+                        'id': item['id'],
+                        'nome': item['nome'],
+                        'cidade': item['cidade'],
+                        'lat_dec': item['lat_dec'],
+                        'lon_dec': item['lon_dec']
+                    })
+        return all_data
+    
     @staticmethod
     def save_data(session):
         aerodromos_data = Aerodromo.extract()
@@ -47,14 +97,40 @@ class Aerodromo(Base):
             )
             session.add(aerodromo)
         session.commit()
+    
+class Taf(Base):
+    # TAF:	id / validade_inicial / validade_final / mens / recebimento
+    __tablename__ = 'TAF'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    valida_inicial = Column(DateTime, nullable=False)
+    valida_final = Column(DateTime, nullable=False)
+    mens = Column(Text)
+    recebimento = Column(DateTime, nullable=False)
+    localidade_id = Column(Integer, ForeignKey('localidade.id'), nullable=False)
+    localidade = relationship('Localidade', back_populates='tafs')
+    
+    @staticmethod
+    def extract(localidade_code):
+        url = f"{API_BASE_URL}/mensagens/taf/{localidade_code}?api_key={API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data["data"]
+        else:
+            print(f"Erro ao buscar dados TAF para a localidade {localidade_code} - Status Code: {response.status_code}")
+            return []
+    
+    @staticmethod
+    def save_data(session):
+        pass #TODO
 
 class Metar(Base):
     __tablename__ = 'METAR'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    aerodromo_id = Column(Integer, ForeignKey('Aerodromo.id'), nullable=False)
     descricao = Column(Text, nullable=False)
     data = Column(DateTime, nullable=False)
-    aerodromo = relationship('Aerodromo', back_populates='metars')
+    localidade_id = Column(Integer, ForeignKey('localidade.id'))
+    localidade = relationship('Localidade', back_populates='metars')
     
     @staticmethod
     def extract(aerodromo_code, start_date, end_date):
@@ -87,12 +163,12 @@ class Metar(Base):
 class Previsao(Base):
     __tablename__ = 'Previsao'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    aerodromo_id = Column(Integer, ForeignKey('Aerodromo.id'), nullable=False)
     data = Column(DateTime, nullable=False)
     temperatura = Column(Float, nullable=False)
     umidade = Column(Float, nullable=False)
     descricao = Column(Text, nullable=False)
-    aerodromo = relationship('Aerodromo', back_populates='previsoes')
+    localidade_id = Column(Integer, ForeignKey('localidade.id'))
+    localidade = relationship('Localidade', back_populates='previsoes')
     
     @staticmethod
     def extract():
@@ -108,6 +184,8 @@ class Radar(Base):
     imagem = Column(String(255), nullable=True)
     data = Column(DateTime, nullable=False)
     descricao = Column(Text, nullable=False)
+    aerodromo_id = Column(Integer, ForeignKey('aerodromo.id'))
+    aerodromo = relationship('Aerodromo', back_populates='radars')
     
     @staticmethod
     def extract():
@@ -165,14 +243,19 @@ class Satelite(Base):
 db = Database()
 
 if __name__ == "__main__":
-    # db.create_tables()
-
+    try:
+        db.create_tables()
+    except Exception as e:
+        print(f"Erro ao criar as tabelas: {e}")
     # session = db.get_session()
+    # localidade = Localidade.save_data(session=session)
+    # session.close()
+    
     # aerodromo = Aerodromo.save_data(session=session)
     # session.close()
     
-    session = db.get_session()
-    metars = Metar.save_data(session=session)
-    session.close()
+    # session = db.get_session()
+    # metars = Metar.save_data(session=session)
+    # session.close()
     
     

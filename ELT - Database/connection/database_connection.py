@@ -13,7 +13,6 @@ engine = create_engine(DATABASE_URL, echo=True)
 Base = declarative_base()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-
 class Database:
     def __init__(self):
         self.engine = engine
