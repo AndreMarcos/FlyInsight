@@ -1,0 +1,30 @@
+# Tabela de cidades encontrada em: https://ajuda.decea.mil.br/base-de-conhecimento/api-redemet-produtos-radar/
+
+CIDADES = [
+    {'Almenara' : 'al'},
+    {'Belém' : 'be'},
+    {'Boa Vista' : 'bv'},
+    {'Canguçu' : 'cn'},
+    {'Cruzeiro do Sul' : 'cz'},
+    {'Gama' : 'ga'},
+    {'Jaraguari' : 'jr'},
+    {'Macapá' : 'mq'},
+    {'Maceió' : 'mo'},
+    {'Manaus' : 'mn'},
+    {'Morro da Igreja' : 'mi'},
+    {'Natal' : 'nt'},
+    {'Petrolina' : 'pl'},
+    {'Pico do Couto' : 'pc'},
+    {'Porto Velho' : 'pv'},
+    {'Salvador' : 'sv'},
+    {'Santarém' : 'sn'},
+    {'Santa Teresa' : 'st'},
+    {'Santiago' : 'sg'},
+    {'São Francisco' : 'sf'},
+    {'São Gabriel da Cachoeira' : 'ua'},
+    {'São Luis' : 'sl'},
+    {'São Roque' : 'sr'},
+    {'Tabatinga' : 'tt'},
+    {'Tefé' : 'tf'},
+    {'Três Marias' : 'tm'}    
+]
