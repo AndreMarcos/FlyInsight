@@ -162,7 +162,7 @@ class Metar(Base):
         
     @staticmethod
     def save_data(session):
-        localidades = session.query(Localidade).filter(Localidade.id > 1443).all()
+        localidades = session.query(Localidade).filter(Localidade.id).all()
         # start_date = datetime(2021, 1, 1)
         # end_date = datetime(2021, 1, 1, 1)
         for localidade in localidades:
@@ -197,21 +197,25 @@ class Previsao(Base):
 
     @staticmethod
     def save_data(session):
-        localidades = session.query(Localidade).all()
+        localidades = session.query(Localidade).filter(Localidade.id > 1677).all()
         for localidade in localidades:
             previsao_data = Previsao.extract(localidade.codigo)
             if previsao_data:
-                for item in previsao_data:
-                    previsao = Previsao(
-                        data=item['Data e Hora'],
-                        temperatura=item['Temperatura'],
-                        umidade=item['UR'],
-                        descricao=item['Condições do Tempo'],
-                        localidade_id=localidade.id
-                    )
-                    session.add(previsao)
-                session.commit()
-
+                if 'temperatura' in previsao_data and 'ur' in previsao_data and 'condicoes_tempo' in previsao_data and 'data' in previsao_data:
+                    try:
+                        temperatura = previsao_data['temperatura'].split('º')[0]
+                        umidade = previsao_data['ur'].split('%')[0]
+                        previsao = Previsao(
+                            data=previsao_data['data'],
+                            temperatura=float(temperatura),
+                            umidade=float(umidade),
+                            descricao=previsao_data['condicoes_tempo'],
+                            localidade_id=localidade.id
+                        )
+                        session.add(previsao)
+                        session.commit()
+                    except ValueError:
+                        pass
 class Radar(Base):
     __tablename__ = 'Radar'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -222,53 +226,83 @@ class Radar(Base):
     aerodromo = relationship('Aerodromo', back_populates='radars')
     
     @staticmethod
-    def extract(cidade):
-        area = cidade
-        url = f"{API_BASE_URL}/produtos/radar/maxcappi?api_key={API_KEY}&data={area}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-        return data["data"]
+    def extract():
+        all_data = []
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime.now() - timedelta(days=1)
+        current_date = start_date
+        
+        while current_date <= end_date:
+            formatted_date = current_date.strftime('%Y%m%d') + '12'
+            url = f"{API_BASE_URL}/produtos/radar/maxcappi?api_key={API_KEY}&data={formatted_date}"
+            response = requests.get(url)
+            if response.status_code == 200:
+                data = response.json().get("data")
+                if data and "radar" in data:
+                    for itens in data['radar']:
+                        for item in itens:
+                            all_data.append({
+                                'path': item['path'],
+                                'data': item['data'],
+                                'nome': item['nome'],
+                                'localidade': item['localidade']
+                            })
+            current_date += timedelta(days=1)
+            
+        return all_data
+            
     
     @staticmethod
     def save_data(session):
         aerodromos = session.query(Aerodromo).all()
-        for aerodromo in aerodromos:
-            radar_data = Radar.extract(aerodromo.cidade)
-            if radar_data["radar"]:
-                for item in radar_data["radar"]:
-                    radar = Radar(
-                        imagem=item['path'],
-                        data=item['data'],
-                        descricao=item['nome'],
-                        aerodromo_id=aerodromo.id
-                    )
-                    session.add(radar)
+        aerodromo_dict = {aerodromo.cidade: aerodromo.id for aerodromo in aerodromos}
+        localidade_para_cidade = {v: k for k, v in CIDADES.items()}
+        
+        radar_data = Radar.extract()
+        for item in radar_data:
+            cidade = localidade_para_cidade.get(item['localidade'])
+            if cidade in aerodromo_dict:
+                aerodromo_id = aerodromo_dict[cidade]
+                if aerodromo_id:
+                    if item['path'] != None and item['data'] != None and item['nome'] != None:
+                        radar = Radar(
+                            imagem=item['path'],
+                            data=item['data'],
+                            descricao=item['nome'],
+                            aerodromo_id=aerodromo_id
+                        )
+                        session.add(radar)
                 session.commit()
-
+                
 db = Database()
 
 if __name__ == "__main__":
-    # try:
-    #     db.create_tables()
-    # except Exception as e:
-    #     print(f"Erro ao criar as tabelas: {e}")
+    try:
+        db.create_tables()
+    except Exception as e:
+        print(f"Erro ao criar as tabelas: {e}")
 
-    # session = db.get_session()
-    # localidade = Localidade.save_data(session=session)
-    # session.close()
+    session = db.get_session()
+    localidade = Localidade.save_data(session=session)
+    session.close()
     
-    # session = db.get_session()
-    # aerodromo = Aerodromo.save_data(session=session)
-    # session.close()
+    session = db.get_session()
+    aerodromo = Aerodromo.save_data(session=session)
+    session.close()
     
-    # session = db.get_session()
-    # taf = Taf.save_data(session=session)
-    # session.close()
+    session = db.get_session()
+    taf = Taf.save_data(session=session)
+    session.close()
     
     session = db.get_session()
     metar = Metar.save_data(session=session)
     session.close()
+   
+    session = db.get_session()
+    radar = Radar.save_data(session=session)
+    session.close()
     
-    
+    session = db.get_session()
+    previsao = Previsao.save_data(session=session)
+    session.close()
     
