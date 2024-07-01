@@ -1,0 +1,28 @@
+# Tabela de cidades encontrada em: https://ajuda.decea.mil.br/base-de-conhecimento/api-redemet-produtos-radar/
+
+CIDADES = {
+    'Almenara/MG' : 'al',
+    'Belém/PA' : 'be',
+    'Boa Vista/RR' : 'bv',
+    'Canguçu/RS' : 'cn',
+    'Cruzeiro do Sul/AC' : 'cz',
+    'Gama/DF' : 'ga',
+    'Jaraguari/MS' : 'jr',
+    'Macapá/AP' : 'mq',
+    'Maceió/AL' : 'mo',
+    'Manaus/AM' : 'mn',
+    'Morro da Igreja/SC' : 'mi',
+    'Natal/RN' : 'nt',
+    'Petrolina/PE' : 'pl',
+    'Pico do Couto/RJ' : 'pc',
+    'Porto Velho/RO' : 'pv',
+    'Salvador/BA' : 'sv',
+    'Santarém/PA' : 'sn',
+    'Santa Teresa/MG' : 'st',
+    'Santiago/RS' : 'sg',
+    'São Francisco/MG' : 'sf',
+    'São Gabriel da Cachoeira/AM' : 'ua',
+    'São Luis/MA' : 'sl',
+    'São Roque/SP' : 'sr',
+    'Tabatinga/AM' : 'tt',
+}
