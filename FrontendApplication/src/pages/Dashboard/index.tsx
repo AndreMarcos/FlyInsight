@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { BaseLayout } from "../../components/BaseLayout";
 import AutoCompleteInput from "../../components/AutoCompleteInput";
-import DatePicker from "../../components/DatePicker";
+// import DatePicker from "../../components/DatePicker";
 import MultiSelectInput from "../../components/MultiSelectInput";
 import CheckboxGroup from "../../components/CheckBox";
 import Modal from "../../components/Modal";
@@ -21,11 +21,12 @@ import {
 export function Dashboard() {
   const [countryValue, setCountryValue] = useState("");
   const [icaoValue, setIcaoValue] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
+  // const [selectedDate, setSelectedDate] = useState("");
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [limit, setLimit] = useState("");
   const [checkboxOptions, setCheckboxOptions] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filters, setFilters] = useState<{ field: string, condition: string, value: string }[]>([]);
   const [tableData, setTableData] = useState<{ [key: string]: string }[]>([]);
 
   const options = [
@@ -76,39 +77,57 @@ export function Dashboard() {
     "TAF - Previsão de Terminal Aérea",
   ];
 
+  const conditions = ["=", "!=", ">", "<", ">=", "<=", "LIKE"];
+
   const informacao = [
     "id", "codigo", "pais",         // Localidade
     "nome", "cidade", "latitude", "longitude", // Aerodromo
-    "descricao", "data", "localidade_id",  // Metar
-    "valida_inicial", "valida_final", "mens", "recebimento",  // Taf
-    "data", "temperatura", "umidade", "descricao",  // Previsao
-    "imagem", "data", "descricao", "aerodromo_id"  // Radar
+    "descricao", "localidade_id",  // Metar
+    "valida_inicial", "valida_final", "mens", "recebimento",  // TAF
+    "temperatura", "umidade",  // Previsao
+    "imagem", "aerodromo_id"  // Radar
   ];
 
   const handleFormSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-
+    console.log("Buscando dados...");
     const query = new URLSearchParams({
       localidade: countryValue,
       codigo: icaoValue,
-      data_inicio: selectedDate,
       informacoes: selectedOptions.join(","),
       metar: checkboxOptions.includes("METAR - Meteorologia em tempo presente").toString(),
       taf: checkboxOptions.includes("TAF - Previsão de Terminal Aérea").toString(),
-      limit: limit
+      limit: limit,
+      filters: JSON.stringify(filters)
     }).toString();
 
     try {
-      console.log('Requesting data...') // 'Requesting data...
-      const response =  await fetch(`http://198.27.114.55:5000/relatorio?${query}`);
+      const response =  await fetch(`http://localhost:5000/relatorio?${query}`);
+      console.log("Buscando dados...");
       const data = response.json();
-      console.log('Data received:', data) // 'Data received:', data
+      console.log(data);
       setTableData(await data); 
       setIsModalOpen(true);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
     }
 
+  };
+
+  const handleAddFilter = () => {
+    console.log("Aqui dados...");
+    setFilters([...filters, { field: "", condition: "", value: "" }]);
+  };
+
+  const handleFilterChange = (index: any, key: any, value: any) => {
+    console.log("Aqui dados2...");
+    const newFilters = [...filters];
+    newFilters[index][key] = value;
+    setFilters(newFilters);
+  };
+
+  const handleRemoveFilter = (index: any) => {
+    setFilters(filters.filter((_, i) => i !== index));
   };
 
   const combinedOptions = [...selectedOptions, ...checkboxOptions];
@@ -134,12 +153,6 @@ export function Dashboard() {
           />
         </AutoCompleteInputContainer>
 
-        <DatePicker
-          label="Data Inicio:"
-          value={selectedDate}
-          onChange={setSelectedDate}
-        />
-
         <MultiSelectInput
           label="Informações:"
           options={informacao}
@@ -163,13 +176,51 @@ export function Dashboard() {
             onChange={(e) => setLimit(e.target.value)}
           />
         </InputContainer>
-        <Button type="submit" disabled={!countryValue && !icaoValue}>
+
+        <Button type="button" onClick={handleAddFilter}>
+          Adicionar Filtro
+        </Button>
+
+        {filters.map((filter, index) => (
+          <div key={index}>
+            <select
+              value={filter.field}
+              onChange={(e) => handleFilterChange(index, "field", e.target.value)}
+            >
+              {informacao.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filter.condition}
+              onChange={(e) => handleFilterChange(index, "condition", e.target.value)}
+            >
+              {conditions.map((condition) => (
+                <option key={condition} value={condition}>
+                  {condition}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={filter.value}
+              onChange={(e) => handleFilterChange(index, "value", e.target.value)}
+            />
+            <Button type="button" onClick={() => handleRemoveFilter(index)}>
+              Remover
+            </Button>
+          </div>
+        ))}
+
+        <Button type="submit" >
           Enviar
         </Button>
       </Form>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-      <Table>
+        <Table>
           <thead>
             <TableRow>
               {combinedOptions.map((option) => (
